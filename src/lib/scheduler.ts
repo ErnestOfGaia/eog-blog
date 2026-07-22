@@ -41,19 +41,23 @@ export function nextPublishSlot(now: Date = new Date()): string {
 // ── Scheduled release (design plan 04 §3.5) ──────────────────────────────────
 // Promote every approved post whose publish_at is due. Called by the Bearer-authed
 // /api/cron/publish-due endpoint (VPS system cron, ~every 15 min).
-export function publishDuePosts(now: Date = new Date()): { published: number; ids: number[] } {
+export function publishDuePosts(
+  now: Date = new Date()
+): { published: number; ids: number[]; posts: { id: number; slug: string }[] } {
   const db = getDb()
   const nowIso = now.toISOString()
   const due = db
     .prepare(
-      `SELECT id FROM content
+      `SELECT id, slug FROM content
        WHERE status='approved' AND publish_at IS NOT NULL AND publish_at <= ?
        ORDER BY publish_at ASC`
     )
-    .all(nowIso) as { id: number }[]
+    .all(nowIso) as { id: number; slug: string }[]
 
   for (const { id } of due) {
     applyTransition(id, 'published')
   }
-  return { published: due.length, ids: due.map((r) => r.id) }
+  // `posts` gives the Blog→LinkedIn routine the slug of each newly-live post so it
+  // can build the LinkedIn post and backfill the discuss link (02 §7a).
+  return { published: due.length, ids: due.map((r) => r.id), posts: due }
 }

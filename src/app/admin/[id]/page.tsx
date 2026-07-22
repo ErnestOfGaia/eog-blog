@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation'
 import { ReviewControls } from '@/components/admin/ReviewControls'
 import { DeleteContentButton } from '@/components/admin/DeleteContentButton'
 import { PreviewButton } from '@/components/admin/PreviewButton'
+import { ImageUploader } from '@/components/admin/ImageUploader'
 import { parseTags } from '@/lib/utils'
 import { runContentGuard } from '@/lib/content-guard'
 import { withBase } from '@/lib/paths'
@@ -98,6 +99,8 @@ export default async function EditContentPage({ params }: { params: Promise<{ id
             <label htmlFor="seo_description" className="block text-sm font-medium text-stone-700 mb-1">SEO description</label>
             <textarea id="seo_description" name="seo_description" rows={2} defaultValue={item.seo_description ?? ''} className={inputCls} />
           </div>
+
+          <ImageUploader />
 
           <div className="md:col-span-2">
             <label htmlFor="body" className="block text-sm font-medium text-stone-700 mb-1">Body * (Markdown)</label>

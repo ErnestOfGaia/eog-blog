@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { withBase } from '@/lib/paths'
+import { ImageUploader } from '@/components/admin/ImageUploader'
 
 const inputCls =
   'w-full px-3 py-2 bg-white text-stone-900 placeholder:text-stone-400 border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-eog-teal focus:border-eog-teal'
@@ -62,6 +63,8 @@ export default function NewContentPage() {
             <label htmlFor="seo_description" className="block text-sm font-medium text-stone-700 mb-1">SEO description <span className="font-normal text-stone-400">(defaults to excerpt)</span></label>
             <textarea id="seo_description" name="seo_description" rows={2} className={inputCls} />
           </div>
+
+          <ImageUploader />
 
           <div className="md:col-span-2">
             <label htmlFor="body" className="block text-sm font-medium text-stone-700 mb-1">Body * (Markdown)</label>
