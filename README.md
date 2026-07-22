@@ -1,3 +1,14 @@
+```
+   _  _                             _    ____                _____       _    ___ 
+ _| || |_  ___ _ __ _ __   ___  ___| |_ / ___| ___   ___  __|_   _|__   / \  |_ _|
+|_  ..  _|/ _ \ '__| '_ \ / _ \/ __| __| |  _ / _ \ / _ \/ __|| |/ _ \ / _ \  | | 
+|_      _|  __/ |  | | | |  __/\__ \ |_| |_| | (_) |  __/\__ \| | (_) / ___ \ | | 
+  |_||_|  \___|_|  |_| |_|\___||___/\__|\____|\___/ \___||___/|_|\___/_/   \_\___|
+                                                                                  
+```
+
+> **#ernestGoesToAI** — the blog for [ernestofgaia.xyz](https://ernestofgaia.xyz)
+
 # eog-blog
 
 A small, self-hosted blog with an editorial review queue and scheduled release.
