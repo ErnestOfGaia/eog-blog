@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getDb } from '@/lib/db'
 import type { ContentSummary } from '@/types'
 import { formatDate, parseTags, readingTimeMinutes, deriveExcerpt } from '@/lib/utils'
+import { withBase } from '@/lib/paths'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,8 +26,20 @@ export default function BlogIndex() {
   return (
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
       <header className="mb-10">
-        <h1 className="text-3xl font-bold text-eog-navy">Blog</h1>
-        <p className="mt-2 text-stone-600">
+        {/* Image-as-heading: the alt text IS the real <h1> for SEO + screen readers,
+            so search reads "The Blog — Ernest Goes to AI" even though it renders as art.
+            width/height set to avoid layout shift (CLS). */}
+        <h1 className="m-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={withBase('/hero-the-blog.webp')}
+            alt="The Blog — Ernest Goes to AI"
+            width={1600}
+            height={533}
+            className="w-full h-auto rounded-lg"
+          />
+        </h1>
+        <p className="mt-4 text-stone-600">
           Notes on building, learning, and helping people put AI to work.
         </p>
       </header>
