@@ -1,0 +1,142 @@
+import Database from 'better-sqlite3'
+import path from 'path'
+import fs from 'fs'
+
+const DB_PATH = process.env.DATABASE_URL ?? path.join(process.cwd(), 'data', 'news.db')
+
+let db: Database.Database | null = null
+
+export function getDb(): Database.Database {
+  if (db) return db
+
+  // Ensure the data directory exists
+  const dir = path.dirname(DB_PATH)
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true })
+  }
+
+  db = new Database(DB_PATH)
+  db.pragma('journal_mode = WAL')
+  db.pragma('foreign_keys = ON')
+
+  initSchema(db)
+  return db
+}
+
+function initSchema(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS content (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      slug          TEXT UNIQUE NOT NULL,
+      title         TEXT NOT NULL,
+      body          TEXT NOT NULL,
+      excerpt       TEXT,
+      type          TEXT NOT NULL DEFAULT 'post',
+      tier          TEXT NOT NULL DEFAULT 'free',
+      series        TEXT,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    -- series: 'build-log' | 'new-news' | null (future series can be added without schema change)
+  `)
+
+  const existingColumns = db.prepare("PRAGMA table_info(content)").all() as { name: string }[]
+  const columnNames = existingColumns.map(c => c.name)
+  if (!columnNames.includes('character')) {
+    db.exec("ALTER TABLE content ADD COLUMN character TEXT")
+  }
+  if (!columnNames.includes('comic_panels')) {
+    db.exec("ALTER TABLE content ADD COLUMN comic_panels TEXT")
+  }
+  // status: 'draft' | 'pending_review' | 'changes_requested' | 'approved' | 'published'
+  if (!columnNames.includes('status')) {
+    db.exec("ALTER TABLE content ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'")
+  }
+  // author: 'ernest' | 'trewkat' | 'hermes'
+  if (!columnNames.includes('author')) {
+    db.exec("ALTER TABLE content ADD COLUMN author TEXT NOT NULL DEFAULT 'ernest'")
+  }
+  if (!columnNames.includes('review_notes')) {
+    db.exec("ALTER TABLE content ADD COLUMN review_notes TEXT")
+  }
+  if (!columnNames.includes('published_at')) {
+    db.exec("ALTER TABLE content ADD COLUMN published_at TEXT")
+  }
+
+  // Ticket 1 — 2026-05-28: three new nullable columns for Static's Report frame.
+  // subject: free-form named subject of the article (e.g. 'Ernest', 'zClaude')
+  if (!columnNames.includes('subject')) {
+    db.exec("ALTER TABLE content ADD COLUMN subject TEXT")
+  }
+  // audience_in_fiction: 'beacon' | null — always 'beacon' for Build Log
+  if (!columnNames.includes('audience_in_fiction')) {
+    db.exec("ALTER TABLE content ADD COLUMN audience_in_fiction TEXT")
+  }
+  // source_seed: filename of the Story Seed this article derives from (audit trail)
+  if (!columnNames.includes('source_seed')) {
+    db.exec("ALTER TABLE content ADD COLUMN source_seed TEXT")
+  }
+
+  // Ticket 1 — 2026-05-28: rename character enum values.
+  // pelican → beacon, gremlin → static (approved by Trewkat through end of 2027).
+  // Each UPDATE is guarded — checks for existence of old value first so re-runs are no-ops.
+  const hasPelican = (db.prepare("SELECT 1 FROM content WHERE character = 'pelican' LIMIT 1").get() !== undefined)
+  if (hasPelican) {
+    db.prepare("UPDATE content SET character = 'beacon' WHERE character = 'pelican'").run()
+  }
+  const hasGremlin = (db.prepare("SELECT 1 FROM content WHERE character = 'gremlin' LIMIT 1").get() !== undefined)
+  if (hasGremlin) {
+    db.prepare("UPDATE content SET character = 'static' WHERE character = 'gremlin'").run()
+  }
+
+  // Backfill status from legacy `published` flag, then drop the column.
+  // Both operations are guarded so they only run on DBs that still have it.
+  if (columnNames.includes('published')) {
+    db.prepare("UPDATE content SET status = 'published' WHERE published = 1 AND status = 'draft'").run()
+    db.exec("ALTER TABLE content DROP COLUMN published")
+  }
+
+  // x_thread_url removed 2026-05-31: the site uses LinkedIn, so the field was
+  // dropped from the admin forms. Guarded so it only runs where the column exists.
+  if (columnNames.includes('x_thread_url')) {
+    db.exec("ALTER TABLE content DROP COLUMN x_thread_url")
+  }
+
+  // Character Development Records (D1 — 2026-06-01). Per-character versioned record
+  // of how a character's art is produced (prompts, seed, tool, reference image) plus
+  // attached reference/test images. The anti-drift store behind /character/<slug>.
+  // status: 'draft' | 'current' | 'superseded' — exactly one 'current' per character
+  // (enforced in the app layer, lib/character-records.ts).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS character_record (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      character       TEXT NOT NULL,
+      version         INTEGER NOT NULL,
+      title           TEXT NOT NULL,
+      summary         TEXT,
+      status          TEXT NOT NULL DEFAULT 'draft',
+      prompt_full     TEXT,
+      style_block     TEXT,
+      negative_block  TEXT,
+      seed            TEXT,
+      tool            TEXT,
+      reference_image TEXT,
+      is_public       INTEGER NOT NULL DEFAULT 0,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS character_record_asset (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      record_id        INTEGER NOT NULL REFERENCES character_record(id) ON DELETE CASCADE,
+      kind             TEXT NOT NULL DEFAULT 'reference',
+      image_path       TEXT NOT NULL,
+      caption          TEXT,
+      checklist_result TEXT,
+      is_public        INTEGER NOT NULL DEFAULT 0,
+      sort_order       INTEGER NOT NULL DEFAULT 0,
+      created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_charrec_character ON character_record(character);
+    CREATE INDEX IF NOT EXISTS idx_charrec_asset_record ON character_record_asset(record_id);
+  `)
+}

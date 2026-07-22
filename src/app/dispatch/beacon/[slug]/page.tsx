@@ -1,0 +1,102 @@
+// Ticket 9 — 2026-05-28: /dispatch/beacon/[slug] — replaces /dispatch/pelican/[slug].
+import { notFound } from 'next/navigation'
+import { getDb } from '@/lib/db'
+import { Content } from '@/types'
+import { formatDate, getSeriesLabel } from '@/lib/utils'
+import type { Metadata } from 'next'
+import Link from 'next/link'
+import MarkdownRenderer from '@/components/ui/MarkdownRenderer'
+import Image from 'next/image'
+
+type Props = {
+  params: Promise<{ slug: string }>
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params
+  const db = getDb()
+  const post = db.prepare(
+    `SELECT title, excerpt FROM content WHERE character = 'beacon' AND slug = ? AND status = 'published'`
+  ).get(slug) as Pick<Content, 'title' | 'excerpt'> | undefined
+
+  if (!post) return {}
+
+  const description = post.excerpt ?? undefined
+  const ogTitle = `${post.title} — Beacon's Dispatch`
+
+  return {
+    title: post.title,
+    description,
+    openGraph: {
+      title: ogTitle,
+      description,
+      type: 'article',
+      images: [
+        {
+          url: '/pelican-banner.png',
+          width: 1200,
+          height: 630,
+          alt: "Beacon — The Guardian",
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: ogTitle,
+      description,
+      images: ['/pelican-banner.png'],
+    },
+  }
+}
+
+export default async function BeaconPostPage({ params }: Props) {
+  const { slug } = await params
+  const db = getDb()
+  const post = db.prepare(
+    `SELECT * FROM content WHERE character = 'beacon' AND slug = ? AND status = 'published'`
+  ).get(slug) as Content | undefined
+
+  if (!post) notFound()
+
+  const seriesLabel = getSeriesLabel(post.series)
+
+  return (
+    <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 flex flex-col gap-8">
+      <Link
+        href="/dispatch/beacon"
+        className="text-label-sm text-nhw-cyan hover:opacity-70 transition-opacity"
+      >
+        ← BEACON&apos;S DISPATCH
+      </Link>
+
+      {/* Banner */}
+      <section className="w-full h-48 sm:h-64 lg:h-80 relative overflow-hidden border-2 border-nhw-cyan group">
+        <Image
+          src="/pelican-banner.png"
+          alt="Beacon Banner"
+          fill
+          className="object-cover opacity-90 group-hover:opacity-100 transition-opacity duration-500"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-nhw-surface/90 via-transparent to-transparent pointer-events-none" />
+      </section>
+
+      <header className="flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <span className="text-label-sm text-nhw-cyan/60 uppercase tracking-widest">
+            BEACON — THE GUARDIAN
+          </span>
+          {seriesLabel && (
+            <span className="bg-nhw-amber/10 text-nhw-amber border border-nhw-amber/30 text-label-sm uppercase tracking-widest px-2 py-0.5">
+              {seriesLabel}
+            </span>
+          )}
+        </div>
+        <h1 className="text-headline-lg text-nhw-cyan uppercase">{post.title}</h1>
+        <time className="text-label-sm text-nhw-cyan/60">{formatDate(post.created_at)}</time>
+      </header>
+
+      <MarkdownRenderer content={post.body} />
+    </main>
+  )
+}

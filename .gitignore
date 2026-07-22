@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+.next/
+out/
+dist/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database (never commit the real db)
+*.db
+*.sqlite
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.log
+*.tsbuildinfo
+*.db-shm
+*.db-wal
+
+# Agent workspace (local tooling, not project code)
+.claude/
+
+# Test-gate evidence / handoff artifacts from agent sessions (local scratch, not source)
+_test_evidence_*/
+
+# Runtime-generated comic panels (published via the agent, synced to prod
+# separately — not source). Keep the directory, ignore its contents.
+/public/media/*
+!/public/media/.gitkeep
+
+# Runtime-uploaded character reference images (D3 — admin upload, synced to
+# prod separately — not source). Keep the directory, ignore its contents.
+/public/character-records/*
+!/public/character-records/.gitkeep
