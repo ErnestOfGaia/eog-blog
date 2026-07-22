@@ -45,3 +45,8 @@ _test_evidence_*/
 # prod separately — not source). Keep the directory, ignore its contents.
 /public/character-records/*
 !/public/character-records/.gitkeep
+
+# SQLite database (runtime data)
+/data/
+*.db
+*.db-*

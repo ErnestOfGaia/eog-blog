@@ -1,11 +1,14 @@
 import type { MetadataRoute } from 'next'
+import { siteConfig } from '@/lib/config'
+import { BASE_PATH } from '@/lib/paths'
 
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: '*',
       allow: '/',
+      disallow: ['/admin', '/login', '/api'],
     },
-    sitemap: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://news.ernestofgaia.xyz'}/sitemap.xml`,
+    sitemap: `${siteConfig.url}${BASE_PATH}/sitemap.xml`,
   }
 }

@@ -14,12 +14,14 @@ export class TransitionError extends Error {
 
 export interface ApplyTransitionOptions {
   reviewNotes?: string | null
+  /** ISO8601 UTC. When approving, schedules the release instant. Ignored otherwise. */
+  publishAt?: string | null
 }
 
 export function applyTransition(
   id: number,
   to: ContentStatus,
-  { reviewNotes }: ApplyTransitionOptions = {}
+  { reviewNotes, publishAt }: ApplyTransitionOptions = {}
 ): Content {
   const db = getDb()
   const current = db.prepare('SELECT status FROM content WHERE id=?').get(id) as
@@ -42,17 +44,27 @@ export function applyTransition(
     )
   }
 
+  // Stamp published_at the moment a post first goes live.
   const publishedAtParam = to === 'published' ? new Date().toISOString() : null
+  // Only set publish_at on approve (COALESCE keeps the existing value otherwise).
+  const publishAtParam = to === 'approved' ? publishAt ?? null : null
   const notesParam = reviewNotes?.trim() || null
 
   db.prepare(
     `UPDATE content
-       SET status = ?,
-           review_notes = COALESCE(?, review_notes),
-           published_at = COALESCE(?, published_at),
+       SET status = @to,
+           review_notes = COALESCE(@notes, review_notes),
+           published_at = COALESCE(@publishedAt, published_at),
+           publish_at   = COALESCE(@publishAt, publish_at),
            updated_at = datetime('now')
-     WHERE id = ?`
-  ).run(to, notesParam, publishedAtParam, id)
+     WHERE id = @id`
+  ).run({
+    to,
+    notes: notesParam,
+    publishedAt: publishedAtParam,
+    publishAt: publishAtParam,
+    id,
+  })
 
   return db.prepare('SELECT * FROM content WHERE id=?').get(id) as Content
 }

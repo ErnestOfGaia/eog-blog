@@ -1,51 +1,45 @@
-// Ticket 5 — 2026-05-28: admin content creation route updated.
-// Added subject, audience_in_fiction, source_seed fields to INSERT.
+// Admin content creation (design plan 04). Creates a draft owned by 'ernest'.
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminApi, redirectTarget } from '@/lib/auth'
 import { getDb } from '@/lib/db'
 import { slugify, uniqueSlug } from '@/lib/utils'
+import { parseContentForm } from '@/lib/content-form'
 
 export async function POST(req: NextRequest) {
   const unauth = await requireAdminApi()
   if (unauth) return unauth
 
-  const data = await req.formData()
-  const title = data.get('title')?.toString().trim() ?? ''
-
-  if (!title) {
-    return NextResponse.json({ error: 'Title required' }, { status: 400 })
+  const parsed = parseContentForm(await req.formData())
+  if ('error' in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 })
   }
-
-  const body = data.get('body')?.toString().trim() ?? ''
-  if (!body) {
-    return NextResponse.json({ error: 'Body required' }, { status: 400 })
-  }
+  const f = parsed.fields
 
   const db = getDb()
-  const slug = uniqueSlug(db, slugify(title))
-  const series = data.get('series')?.toString() || null
-  const character = data.get('character')?.toString() || null
-  const subject = data.get('subject')?.toString().trim() || null
-  const audienceInFiction = data.get('audience_in_fiction')?.toString() || null
-  const sourceSeed = data.get('source_seed')?.toString().trim() || null
+  const slug = uniqueSlug(db, slugify(f.title))
 
-  db.prepare(`
-    INSERT INTO content (slug, title, body, excerpt, type, tier, series, character,
-                         subject, audience_in_fiction, source_seed)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    slug,
-    title,
-    body,
-    data.get('excerpt')?.toString() || null,
-    data.get('type') ?? 'post',
-    data.get('tier') ?? 'free',
-    series,
-    character,
-    subject,
-    audienceInFiction,
-    sourceSeed
-  )
+  const result = db
+    .prepare(
+      `INSERT INTO content
+         (slug, title, body, excerpt, tags, cover_image, cover_image_alt,
+          seo_title, seo_description, canonical_url, discuss_linkedin_url,
+          status, author)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', 'ernest')`
+    )
+    .run(
+      slug,
+      f.title,
+      f.body,
+      f.excerpt,
+      f.tags,
+      f.cover_image,
+      f.cover_image_alt,
+      f.seo_title,
+      f.seo_description,
+      f.canonical_url,
+      f.discuss_linkedin_url
+    )
 
-  return NextResponse.redirect(redirectTarget(req, '/admin'), { status: 303 })
+  const id = Number(result.lastInsertRowid)
+  return NextResponse.redirect(redirectTarget(req, `/admin/${id}`), { status: 303 })
 }

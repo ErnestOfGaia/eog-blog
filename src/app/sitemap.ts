@@ -1,80 +1,36 @@
 import type { MetadataRoute } from 'next'
 import { getDb } from '@/lib/db'
+import { siteConfig } from '@/lib/config'
+import { BASE_PATH } from '@/lib/paths'
 
 export const dynamic = 'force-dynamic'
 
-type ContentSitemapRow = {
-  slug: string
-  character: 'beacon' | 'static' | 'zclaude' | 'comics' | 'ag' | null
-  updated_at: string
-}
+const BASE = `${siteConfig.url}${BASE_PATH}`
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const db = getDb()
   const rows = db
     .prepare(
-      `SELECT slug, character, updated_at
-       FROM content
-       WHERE status = 'published' AND tier = 'free'
-       ORDER BY created_at DESC`
+      `SELECT slug, updated_at FROM content
+       WHERE status = 'published'
+       ORDER BY published_at DESC`
     )
-    .all() as ContentSitemapRow[]
+    .all() as { slug: string; updated_at: string }[]
 
-  const base = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://news.ernestofgaia.xyz'
+  const posts: MetadataRoute.Sitemap = rows.map((r) => ({
+    url: `${BASE}/${r.slug}`,
+    lastModified: new Date(r.updated_at),
+    changeFrequency: 'monthly',
+    priority: 0.8,
+  }))
 
-  const contentEntries: MetadataRoute.Sitemap = rows
-    .filter((r) => r.character !== null)
-    .map((r) => ({
-      url: `${base}/dispatch/${r.character}/${r.slug}`,
-      lastModified: new Date(r.updated_at),
-      changeFrequency: 'weekly',
-      priority: 0.8,
-    }))
-
-  const staticPages: MetadataRoute.Sitemap = [
+  return [
     {
-      url: base,
+      url: BASE,
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 1,
     },
-    {
-      url: `${base}/about`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.5,
-    },
-    {
-      url: `${base}/dispatch/beacon`,
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 0.9,
-    },
-    {
-      url: `${base}/dispatch/static`,
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 0.9,
-    },
-    {
-      url: `${base}/dispatch/zclaude`,
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 0.9,
-    },
-    {
-      url: `${base}/dispatch/comics`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.7,
-    },
-    {
-      url: `${base}/scene/command-center`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.7,
-    },
+    ...posts,
   ]
-
-  return [...staticPages, ...contentEntries]
 }

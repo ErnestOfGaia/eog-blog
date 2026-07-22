@@ -1,49 +1,43 @@
-// Ticket 5 — 2026-05-28: admin content update route updated.
-// Added subject, audience_in_fiction, source_seed fields to UPDATE.
+// Admin content update + delete (design plan 04).
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminApi, redirectTarget } from '@/lib/auth'
 import { getDb } from '@/lib/db'
+import { parseContentForm } from '@/lib/content-form'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const unauth = await requireAdminApi()
   if (unauth) return unauth
 
   const id = parseInt((await params).id)
-  if (isNaN(id)) {
-    return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
-  }
+  if (isNaN(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
 
-  const data = await req.formData()
-  const title = data.get('title')?.toString().trim() ?? ''
-
-  if (!title) {
-    return NextResponse.json({ error: 'Title required' }, { status: 400 })
+  const parsed = parseContentForm(await req.formData())
+  if ('error' in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 })
   }
-
-  const body = data.get('body')?.toString().trim() ?? ''
-  if (!body) {
-    return NextResponse.json({ error: 'Body required' }, { status: 400 })
-  }
+  const f = parsed.fields
 
   const db = getDb()
-  const excerpt = data.get('excerpt')?.toString().trim() || null
-  const type = data.get('type') ?? 'post'
-  const tier = data.get('tier') ?? 'free'
-  const series = data.get('series')?.toString() || null
-  const character = data.get('character')?.toString() || null
-  const subject = data.get('subject')?.toString().trim() || null
-  const audienceInFiction = data.get('audience_in_fiction')?.toString() || null
-  const sourceSeed = data.get('source_seed')?.toString().trim() || null
-
   db.prepare(
     `UPDATE content
-     SET title=?, body=?, excerpt=?, type=?, tier=?, series=?, character=?,
-         subject=?, audience_in_fiction=?, source_seed=?,
-         updated_at=datetime('now')
+       SET title=?, body=?, excerpt=?, tags=?, cover_image=?, cover_image_alt=?,
+           seo_title=?, seo_description=?, canonical_url=?, discuss_linkedin_url=?
      WHERE id=?`
-  ).run(title, body, excerpt, type, tier, series, character, subject, audienceInFiction, sourceSeed, id)
+  ).run(
+    f.title,
+    f.body,
+    f.excerpt,
+    f.tags,
+    f.cover_image,
+    f.cover_image_alt,
+    f.seo_title,
+    f.seo_description,
+    f.canonical_url,
+    f.discuss_linkedin_url,
+    id
+  )
 
-  return NextResponse.redirect(redirectTarget(req, '/admin'), { status: 303 })
+  return NextResponse.redirect(redirectTarget(req, `/admin/${id}`), { status: 303 })
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -51,9 +45,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (unauth) return unauth
 
   const id = parseInt((await params).id)
-  if (isNaN(id)) {
-    return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
-  }
+  if (isNaN(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
 
   const db = getDb()
   db.prepare('DELETE FROM content WHERE id = ?').run(id)

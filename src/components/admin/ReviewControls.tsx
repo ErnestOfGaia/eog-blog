@@ -1,28 +1,24 @@
 'use client'
 
-// Ticket 8 — 2026-05-28: ReviewControls updated:
-//   - AUTHOR_LABELS: added publishing_agent entry.
-//   - Props: added optional subject and sourceSeed for sidebar display.
-//   - New metadata sidebar block renders subject and source-seed for Trewkat's review.
-
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { ContentAuthor, ContentStatus } from '@/types'
+import { authorChip } from '@/components/admin/chips'
+import { withBase } from '@/lib/paths'
 
 interface Props {
   id: number
   currentStatus: ContentStatus
   reviewNotes: string | null
   author: ContentAuthor
-  subject?: string | null
-  sourceSeed?: string | null
+  publishAt: string | null
 }
 
 const STATUS_LABELS: Record<ContentStatus, string> = {
   draft: 'Draft',
   pending_review: 'Pending Review',
   changes_requested: 'Changes Requested',
-  approved: 'Approved',
+  approved: 'Approved (scheduled)',
   published: 'Published',
 }
 
@@ -34,37 +30,46 @@ const STATUS_COLORS: Record<ContentStatus, string> = {
   published: 'bg-emerald-100 text-emerald-800',
 }
 
-const AUTHOR_LABELS: Record<ContentAuthor, string> = {
-  ernest: 'Ernest',
-  trewkat: 'Trewkat',
-  hermes: 'Hermes (legacy)',
-  publishing_agent: 'Publishing Agent',
+function formatSlot(iso: string | null): string | null {
+  if (!iso) return null
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(iso))
+  } catch {
+    return iso
+  }
 }
 
-export function ReviewControls({ id, currentStatus, reviewNotes, author, subject, sourceSeed }: Props) {
+export function ReviewControls({ id, currentStatus, reviewNotes, author, publishAt }: Props) {
   const router = useRouter()
   const [localStatus, setLocalStatus] = useState<ContentStatus>(currentStatus)
   const [localNotes, setLocalNotes] = useState<string | null>(reviewNotes)
+  const [localPublishAt, setLocalPublishAt] = useState<string | null>(publishAt)
   const [showNotesInput, setShowNotesInput] = useState(false)
   const [notesInput, setNotesInput] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Sync when server re-renders with fresh props after router.refresh()
   useEffect(() => { setLocalStatus(currentStatus) }, [currentStatus])
   useEffect(() => { setLocalNotes(reviewNotes) }, [reviewNotes])
+  useEffect(() => { setLocalPublishAt(publishAt) }, [publishAt])
 
   async function transition(to: ContentStatus, notes?: string) {
     setSubmitting(true)
     setError(null)
     try {
-      const res = await fetch(`/api/content/${id}/transition`, {
+      const res = await fetch(withBase(`/api/content/${id}/transition`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: to, review_notes: notes ?? null }),
       })
       if (res.ok) {
-        setLocalStatus(to)
+        const row = (await res.json()) as { status: ContentStatus; publish_at: string | null }
+        setLocalStatus(row.status)
+        setLocalPublishAt(row.publish_at)
         setLocalNotes(notes ?? localNotes)
         setShowNotesInput(false)
         setNotesInput('')
@@ -78,38 +83,32 @@ export function ReviewControls({ id, currentStatus, reviewNotes, author, subject
     }
   }
 
+  const chip = authorChip(author)
+  const slot = formatSlot(localPublishAt)
+
   return (
     <section className="mt-8 pt-6 border-t border-stone-200 space-y-4">
-      {/* Status + author row */}
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-sm font-medium text-stone-600">Status:</span>
         <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${STATUS_COLORS[localStatus]}`}>
           {STATUS_LABELS[localStatus]}
         </span>
         <span className="text-stone-300 select-none">·</span>
-        <span className="text-sm text-stone-500">
-          Author: <span className="font-medium text-stone-700">{AUTHOR_LABELS[author]}</span>
+        <span className="text-sm text-stone-500">Author:</span>
+        <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium ${chip.className}`}>
+          {chip.label}
         </span>
       </div>
 
-      {/* Ticket 8: metadata sidebar for Trewkat's review surface */}
-      {(subject || sourceSeed) && (
-        <div className="rounded-md bg-stone-50 border border-stone-200 px-4 py-3 text-sm space-y-1">
-          {subject && (
-            <p className="text-stone-600">
-              <span className="font-medium text-stone-700">Subject:</span> {subject}
-            </p>
-          )}
-          {sourceSeed && (
-            <p className="text-stone-600">
-              <span className="font-medium text-stone-700">Source Seed:</span>{' '}
-              <code className="text-xs bg-stone-100 px-1 py-0.5 rounded font-mono">{sourceSeed}</code>
-            </p>
-          )}
+      {(localStatus === 'approved' || localStatus === 'published') && slot && (
+        <div className="rounded-md bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-900">
+          <span className="font-medium">
+            {localStatus === 'approved' ? 'Scheduled to publish:' : 'Published slot:'}
+          </span>{' '}
+          {slot} (Pacific)
         </div>
       )}
 
-      {/* Existing review_notes callout */}
       {localNotes && localStatus === 'changes_requested' && (
         <div className="rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-900">
           <p className="font-semibold mb-1">Changes requested:</p>
@@ -117,13 +116,12 @@ export function ReviewControls({ id, currentStatus, reviewNotes, author, subject
         </div>
       )}
 
-      {/* Action buttons */}
       <div className="flex flex-wrap items-start gap-3">
         {localStatus === 'draft' && (
           <button
             onClick={() => transition('pending_review')}
             disabled={submitting}
-            className="px-4 py-2 text-sm font-medium text-white bg-stone-900 rounded-md hover:bg-stone-800 disabled:opacity-50"
+            className="px-4 py-2 text-sm font-medium text-white bg-eog-navy rounded-md hover:opacity-90 disabled:opacity-50"
           >
             Submit for review
           </button>
@@ -136,7 +134,7 @@ export function ReviewControls({ id, currentStatus, reviewNotes, author, subject
               disabled={submitting}
               className="px-4 py-2 text-sm font-medium text-white bg-green-700 rounded-md hover:bg-green-800 disabled:opacity-50"
             >
-              Approve
+              Approve &amp; schedule
             </button>
             <button
               onClick={() => setShowNotesInput((v) => !v)}
@@ -164,7 +162,7 @@ export function ReviewControls({ id, currentStatus, reviewNotes, author, subject
             disabled={submitting}
             className="px-4 py-2 text-sm font-medium text-white bg-emerald-700 rounded-md hover:bg-emerald-800 disabled:opacity-50"
           >
-            Publish
+            Publish now
           </button>
         )}
 
@@ -179,7 +177,6 @@ export function ReviewControls({ id, currentStatus, reviewNotes, author, subject
         )}
       </div>
 
-      {/* Review notes input (shown when requesting changes) */}
       {showNotesInput && (
         <div className="space-y-2">
           <label className="block text-sm font-medium text-stone-700">
@@ -191,7 +188,7 @@ export function ReviewControls({ id, currentStatus, reviewNotes, author, subject
             value={notesInput}
             onChange={(e) => setNotesInput(e.target.value)}
             rows={4}
-            className="w-full px-3 py-2 bg-white text-stone-900 placeholder:text-stone-400 border border-stone-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-stone-500"
+            className="w-full px-3 py-2 bg-white text-stone-900 placeholder:text-stone-400 border border-stone-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-eog-teal"
             placeholder="Describe what needs to change…"
           />
           <div className="flex gap-3">
@@ -213,9 +210,7 @@ export function ReviewControls({ id, currentStatus, reviewNotes, author, subject
         </div>
       )}
 
-      {error && (
-        <p className="text-sm text-red-600">{error}</p>
-      )}
+      {error && <p className="text-sm text-red-600">{error}</p>}
     </section>
   )
 }

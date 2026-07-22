@@ -1,31 +1,32 @@
 services:
-  news-hub:
-    build: .
+  eog-blog:
+    image: ghcr.io/ernestofgaia/eog-blog:latest
+    # For a local/VPS source build instead of the registry image, comment `image`
+    # above and uncomment: build: .
+    container_name: eog_blog
     restart: unless-stopped
-    ports:
-      - "3001:3000"
     environment:
+      - NODE_ENV=production
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - DATABASE_URL=/app/data/news.db
-      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
-      - HERMES_API_KEY=${HERMES_API_KEY}
+      - SESSION_SALT=${SESSION_SALT}
+      - DATABASE_URL=/app/data/blog.db
+      - SITE_URL=${SITE_URL:-https://ernestofgaia.xyz}
+      - SITE_NAME=${SITE_NAME:-Ernest of Gaia}
+      - CONTACT_SMS=${CONTACT_SMS:-503-664-0546}
+      - CONTACT_EMAIL=${CONTACT_EMAIL:-eog@ernestofgaia.xyz}
       - PUBLISHING_AGENT_API_KEY=${PUBLISHING_AGENT_API_KEY}
+      - CRON_API_KEY=${CRON_API_KEY}
     volumes:
-      # Persist the SQLite database across container restarts
-      - ./data:/app/data
-      # Serve runtime-generated comic panels without a rebuild. The publishing
-      # agent writes panels to host public/media/<slug>/; this bind mount makes
-      # them visible to the container live. (public/comics/ stays baked into the
-      # image — only the media/ subdir is mounted.)
-      - ./public/media:/app/public/media
-      # Runtime-uploaded character reference images. Admin writes to
-      # public/character-records/; same live-serve pattern as media/
-      # (Next snapshots public/ at startup, so a restart picks up new files).
-      - ./public/character-records:/app/public/character-records
+      # SQLite DB persists here (design plan 04 §3.2). Named volume, snapshot-covered.
+      - eog-blog-data:/app/data
     networks:
-      - default
+      # NPM adds a custom location  ernestofgaia.xyz/blog → eog_blog:3000
       - nginx-proxy
 
 networks:
   nginx-proxy:
     external: true
+
+volumes:
+  eog-blog-data:
+    name: eog-blog-data

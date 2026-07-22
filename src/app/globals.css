@@ -2,7 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --eog-cream: #ede4c2;
+  --eog-navy: #2c3b4a;
+}
+
 body {
-  background-color: theme('colors.nhw-bg');
-  color: #e8e6e1;
+  background-color: #f7f3e6;
+  color: var(--eog-navy);
 }
