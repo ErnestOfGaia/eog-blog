@@ -10,13 +10,13 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   title: {
-    default: `Blog — ${siteConfig.name}`,
+    default: `${siteConfig.blogName} — the ${siteConfig.name} blog`,
     template: `%s | ${siteConfig.name}`,
   },
   description: siteConfig.description,
   openGraph: {
     siteName: siteConfig.name,
-    title: `Blog — ${siteConfig.name}`,
+    title: `${siteConfig.blogName} — the ${siteConfig.name} blog`,
     description: siteConfig.description,
     locale: 'en_US',
     type: 'website',

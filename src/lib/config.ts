@@ -8,8 +8,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const siteConfig = {
-  /** Public-facing site name (author brand). */
+  /** Parent brand / author name — used in SEO titles (the searchable name). */
   name: process.env.SITE_NAME ?? 'Ernest of Gaia',
+  /** Playful blog wordmark shown in the header (personality, not the SEO title). */
+  blogName: process.env.BLOG_NAME ?? 'Ernest Goes to AI',
+  /** Campaign hashtag — unifies blog + LinkedIn (social + taglines). camelCase = a11y. */
+  hashtag: process.env.BLOG_HASHTAG ?? '#ernestGoesToAI',
   /** Short label for admin chrome / tab titles. */
   shortName: process.env.SITE_SHORT_NAME ?? 'EOG Blog',
   /** Origin (no trailing slash). */
